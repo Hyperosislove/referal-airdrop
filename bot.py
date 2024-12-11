@@ -3,16 +3,18 @@ import logging
 import os
 from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
-from telethon import TelegramClient, events
+from telethon import TelegramClient
+from telethon.sessions import StringSession
 import pymongo
 from datetime import datetime
 from pymongo import MongoClient
 
-# Fetching the MongoDB URI, Bot Token, API ID, and API Hash from environment variables
+# Fetching the necessary variables from environment variables
 MONGODB_URI = os.getenv("MONGODB_URI")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 API_ID = int(os.getenv("API_ID"))
 API_HASH = os.getenv("API_HASH")
+STRING_SESSION = os.getenv("STRING_SESSION")  # Get the Telethon session string
 
 # MongoDB connection
 client = MongoClient(MONGODB_URI)
@@ -23,105 +25,40 @@ users = db['users']
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Telethon Client for handling user-level interactions (optional if needed)
-telethon_client = TelegramClient('session_name', API_ID, API_HASH)
+# Telethon Client 
+telethon_client = TelegramClient(StringSession(STRING_SESSION), API_ID, API_HASH)
 
-# Helper function to check if wallet address is valid
+# Helper function to check if wallet address is valid (placeholder)
 def is_valid_wallet_address(address: str):
     return address.startswith("T")  # Example for Tron addresses
 
+# --- Telegram Bot Command Handlers ---
+
 # Register new user and give them a starting balance
 async def start(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    user_name = update.message.from_user.first_name
-    referrer = context.args[0] if len(context.args) > 0 else None
-    
-    # Check if user is already registered
-    user = users.find_one({"user_id": user_id})
-    
-    if not user:
-        # New user, add to the database and give them 0.5 USDT starting balance
-        users.insert_one({
-            "user_id": user_id,
-            "user_name": user_name,
-            "balance": 0.5,
-            "points": 0,
-            "referrals": 0,
-            "referrer": referrer,
-            "created_at": datetime.now()
-        })
-        
-        # If they were referred by someone, give the referrer 0.5 USDT
-        if referrer:
-            referrer_user = users.find_one({"user_id": referrer})
-            if referrer_user:
-                users.update_one({"user_id": referrer}, {"$inc": {"balance": 0.5, "referrals": 1}})
-        
-        await update.message.reply_text(
-            f"Welcome {user_name}! 🎉 You've been registered and received 0.5 USDT. \n\n"
-            "Use /points to check your points, and /referral to get your referral link!"
-        )
-    else:
-        await update.message.reply_text(f"Welcome back, {user_name}! 😊")
+    # ... (Your existing start command logic) ...
 
 # Command to check points
 async def points(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    user = users.find_one({"user_id": user_id})
-    
-    if user:
-        await update.message.reply_text(f"Your current points: {user['points']} 🏅\nBalance: {user['balance']} USDT 💰")
-    else:
-        await update.message.reply_text("You need to register first by typing /start")
+    # ... (Your existing points command logic) ...
 
 # Referral system: Display referral link
 async def referral(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    referral_link = f"https://t.me/{context.bot.username}?start={user_id}"
-    await update.message.reply_text(f"Your referral link: {referral_link} 🔗\nInvite friends and earn rewards!")
+    # ... (Your existing referral command logic) ...
 
 # Handle withdrawal (Dummy system for now)
 async def withdraw(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    user = users.find_one({"user_id": user_id})
-    
-    if user and user['balance'] >= 5:
-        await update.message.reply_text(
-            "Your withdrawal request has been processed! 💸 Please send your wallet address (USDT) for the transfer. 🔜"
-        )
-        await update.message.reply_text("Please send your wallet address below:")
-    else:
-        await update.message.reply_text(
-            "You need to have at least 5 USDT to withdraw. Your current balance is: "
-            f"{user['balance']} USDT 💰"
-        )
+    # ... (Your existing withdraw command logic) ...
 
-# Handling wallet address submission for withdrawal (for now just log it)
+# Handling wallet address submission for withdrawal
 async def handle_wallet(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    wallet_address = update.message.text
-
-    # Ensure the wallet address is valid
-    if is_valid_wallet_address(wallet_address):
-        users.update_one(
-            {"user_id": user_id},
-            {"$inc": {"balance": -5}}  # Decrease 5 USDT for withdrawal (Dummy)
-        )
-        await update.message.reply_text(
-            f"Your withdrawal of 5 USDT has been processed. 🚀 Your wallet address is: {wallet_address} 💼"
-        )
-    else:
-        await update.message.reply_text("Invalid wallet address! Please provide a valid USDT wallet address.")
+    # ... (Your existing handle_wallet command logic) ...
 
 # Admin commands (for future use)
 async def admin(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    # Replace with the admin's user ID
-    ADMIN_ID = 123456789  
-    if user_id == ADMIN_ID:
-        await update.message.reply_text("You are an admin! Here you can manage user data.")
-    else:
-        await update.message.reply_text("You are not authorized to access the admin panel.")
+    # ... (Your existing admin command logic) ...
+
+# --- Main Functions ---
 
 # Main function to handle Telegram Bot commands
 async def main():
@@ -134,20 +71,24 @@ async def main():
     application.add_handler(CommandHandler("referral", referral))
     application.add_handler(CommandHandler("withdraw", withdraw))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_wallet))
-    application.add_handler(CommandHandler("admin", admin))  # Admin panel (future)
+    application.add_handler(CommandHandler("admin", admin))
 
     # Run the bot until you send a signal to stop it
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
-    await application.idle()  # This will keep the bot running until you stop it manually
+    await application.idle()
 
-# Run both the Telegram bot and Telethon client asynchronously in the same event loop
+# Run both the Telegram bot and Telethon client asynchronously
 async def run_bot_and_telethon():
-    await telethon_client.start()
-    print("Telethon client is running...")
-    await main()  # Run the Telegram bot
+    await telethon_client.connect()  # Connect the Telethon client
+    if not await telethon_client.is_user_authorized():
+        # If the user is not authorized, handle the authorization process here
+        # ... (Your authorization logic, if needed) ... 
+    else:
+        print("Telethon client is running...")
 
+    await main()  # Run the Telegram bot
 
 # Run the combined tasks
 if __name__ == '__main__':
