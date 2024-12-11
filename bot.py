@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import os
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackContext, MessageHandler, filters
 from telethon import TelegramClient, events
 import pymongo
@@ -123,11 +123,6 @@ async def admin(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("You are not authorized to access the admin panel.")
 
-# Start Telethon Client to listen for events (optional)
-async def start_telethon():
-    await telethon_client.start()
-    print("Telethon client is running...")
-
 # Main function to handle Telegram Bot commands
 async def main():
     # Create application with bot token
@@ -141,17 +136,20 @@ async def main():
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_wallet))
     application.add_handler(CommandHandler("admin", admin))  # Admin panel (future)
 
-    # Run the bot
-    await application.run_polling()
+    # Run the bot until you send a signal to stop it
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    await application.idle()  # This will keep the bot running until you stop it manually
 
 # Run both the Telegram bot and Telethon client asynchronously in the same event loop
 async def run_bot_and_telethon():
-    tasks = [
-        main(),  # Run the Telegram bot
-        start_telethon()  # Run the Telethon client
-    ]
-    await asyncio.gather(*tasks)
+    await telethon_client.start()
+    print("Telethon client is running...")
+    await main()  # Run the Telegram bot
+
 
 # Run the combined tasks
 if __name__ == '__main__':
-    asyncio.run(run_bot_and_telethon())
+    asyncio.get_event_loop().run_until_complete(run_bot_and_telethon())
+    
