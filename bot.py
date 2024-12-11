@@ -144,7 +144,12 @@ async def main():
     # Run the bot
     await application.run_polling()
 
-# Run the bot and the Telethon client asynchronously
+# Run the bot and the Telethon client asynchronously in the same event loop
 if __name__ == '__main__':
-    asyncio.run(main())
-    asyncio.run(start_telethon())
+    loop = asyncio.get_event_loop()
+    # Run both the Telegram Bot and Telethon client concurrently
+    tasks = [
+        loop.create_task(main()),
+        loop.create_task(start_telethon())
+    ]
+    loop.run_until_complete(asyncio.gather(*tasks))
